@@ -26,15 +26,18 @@ export class DatabaseStorage implements IStorage {
       
       // Filter by search query if specified
       if (searchQuery) {
-        const searchConditions = [
-          ilike(items.title, `%${searchQuery}%`),
-          ilike(items.content, `%${searchQuery}%`),
-          ilike(items.fileName, `%${searchQuery}%`)
-        ];
-        conditions.push(or(...searchConditions));
+        conditions.push(
+          or(
+            ilike(items.title, `%${searchQuery}%`),
+            ilike(items.content, `%${searchQuery}%`),
+            ilike(items.fileName, `%${searchQuery}%`)
+          )
+        );
       }
       
-      query = query.where(and(...conditions));
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions));
+      }
       
       const results = await query.orderBy(items.createdAt);
       return results.reverse(); // Show newest first
@@ -207,4 +210,4 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
