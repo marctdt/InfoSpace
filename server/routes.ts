@@ -5,6 +5,7 @@ import path from "path";
 import fs from "fs";
 import { storage } from "./storage";
 import { insertItemSchema, contactSchema, linkSchema, noteSchema } from "@shared/schema";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 import { z } from "zod";
 
 // Configure multer for file uploads
@@ -25,11 +26,28 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Auth middleware
+  await setupAuth(app);
+
+  // Auth routes
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
   // Get all items with optional search and filtering
-  app.get("/api/items", async (req, res) => {
+  app.get("/api/items", isAuthenticated, async (req: any, res) => {
     try {
       const { search, type } = req.query;
+      const userId = req.user.claims.sub;
       const items = await storage.getItems(
+        userId,
         search as string, 
         type as string
       );
@@ -56,7 +74,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Upload file
-  app.post("/api/items/file", upload.single('file'), async (req, res) => {
+  app.post("/api/items/file", isAuthenticated, upload.single('file'), async (req: any, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
@@ -64,10 +82,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { tags = "[]" } = req.body;
       const parsedTags = JSON.parse(tags);
+      const userId = req.user.claims.sub;
 
       const fileUrl = `/uploads/${req.file.filename}`;
       
-      const item = await storage.createItem({
+      const item = await storage.createItem(userId, {
         title: req.file.originalname,
         content: null,
         type: 'file',
@@ -86,7 +105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create note
-  app.post("/api/items/note", async (req, res) => {
+  app.post("/api/items/note", isAuthenticated, async (req: any, res) => {
     try {
       const validation = noteSchema.safeParse(req.body);
       if (!validation.success) {
@@ -98,8 +117,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { title, content } = validation.data;
       const { tags = [] } = req.body;
+      const userId = req.user.claims.sub;
 
-      const item = await storage.createItem({
+      const item = await storage.createItem(userId, {
         title,
         content,
         type: 'note',
@@ -118,7 +138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create contact
-  app.post("/api/items/contact", async (req, res) => {
+  app.post("/api/items/contact", isAuthenticated, async (req: any, res) => {
     try {
       const validation = contactSchema.safeParse(req.body);
       if (!validation.success) {
@@ -130,8 +150,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const contactData = validation.data;
       const { tags = [] } = req.body;
+      const userId = req.user.claims.sub;
 
-      const item = await storage.createItem({
+      const item = await storage.createItem(userId, {
         title: contactData.name,
         content: contactData.notes || null,
         type: 'contact',
@@ -155,7 +176,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create link
-  app.post("/api/items/link", async (req, res) => {
+  app.post("/api/items/link", isAuthenticated, async (req: any, res) => {
     try {
       const validation = linkSchema.safeParse(req.body);
       if (!validation.success) {
@@ -167,8 +188,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { title, url, description } = validation.data;
       const { tags = [] } = req.body;
+      const userId = req.user.claims.sub;
 
-      const item = await storage.createItem({
+      const item = await storage.createItem(userId, {
         title,
         content: description || null,
         type: 'link',

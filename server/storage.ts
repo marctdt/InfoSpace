@@ -148,9 +148,17 @@ export class MemStorage implements IStorage {
     const id = this.currentId++;
     const now = new Date();
     const item: Item = {
-      ...insertItem,
       id,
       userId,
+      title: insertItem.title,
+      content: insertItem.content || null,
+      type: insertItem.type,
+      fileUrl: insertItem.fileUrl || null,
+      fileName: insertItem.fileName || null,
+      fileSize: insertItem.fileSize || null,
+      mimeType: insertItem.mimeType || null,
+      tags: insertItem.tags || null,
+      metadata: insertItem.metadata || null,
       createdAt: now,
       updatedAt: now,
     };
@@ -186,7 +194,11 @@ export class MemStorage implements IStorage {
     const existingUser = this.users.get(userData.id);
     const now = new Date();
     const user: User = {
-      ...userData,
+      id: userData.id,
+      email: userData.email || null,
+      firstName: userData.firstName || null,
+      lastName: userData.lastName || null,
+      profileImageUrl: userData.profileImageUrl || null,
       createdAt: existingUser?.createdAt || now,
       updatedAt: now,
     };
@@ -195,4 +207,4 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new DatabaseStorage();
+export const storage = new MemStorage();
