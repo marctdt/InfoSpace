@@ -1,10 +1,13 @@
 import { useState } from "react";
-import { Copy, Eye, ExternalLink, Phone, Mail, X } from "lucide-react";
+import { Copy, Eye, ExternalLink, Phone, Mail, Trash2, MoreVertical } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import { apiRequest } from "@/lib/queryClient";
 import { Item, ContactMetadata, LinkMetadata } from "@/lib/types";
 import { formatDistanceToNow } from "date-fns";
 
@@ -15,6 +18,23 @@ interface ItemCardProps {
 export function ItemCard({ item }: ItemCardProps) {
   const { copyToClipboard } = useCopyToClipboard();
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/items/${item.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error("Failed to delete item");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/items"] });
+    },
+  });
 
   const getFileIcon = (mimeType: string | null) => {
     if (!mimeType) return "📄";
@@ -183,14 +203,37 @@ export function ItemCard({ item }: ItemCardProps) {
           <p className="text-xs text-muted-foreground">
             {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
           </p>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 h-auto"
-            onClick={handleCopy}
-          >
-            <Copy className="w-4 h-4" />
-          </Button>
+          <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-1 h-auto"
+              onClick={handleCopy}
+            >
+              <Copy className="w-4 h-4" />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="p-1 h-auto"
+                >
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => deleteMutation.mutate()}
+                  className="text-red-600 focus:text-red-600"
+                  disabled={deleteMutation.isPending}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  {deleteMutation.isPending ? "Deleting..." : "Delete"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
         {item.tags.length > 0 && (

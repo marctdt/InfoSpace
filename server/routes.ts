@@ -58,7 +58,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get single item
-  app.get("/api/items/:id", async (req, res) => {
+  app.get("/api/items/:id", isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const item = await storage.getItem(id);
@@ -70,6 +70,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(item);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch item" });
+    }
+  });
+
+  // Delete item
+  app.delete("/api/items/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteItem(id);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Item not found" });
+      }
+      
+      res.json({ success: true, message: "Item deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete item" });
     }
   });
 
