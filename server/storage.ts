@@ -1,4 +1,6 @@
 import { items, type Item, type InsertItem } from "@shared/schema";
+import { db } from "./db";
+import { eq, and, ilike, or } from "drizzle-orm";
 
 export interface IStorage {
   getItems(searchQuery?: string, type?: string): Promise<Item[]>;
@@ -6,6 +8,74 @@ export interface IStorage {
   createItem(item: InsertItem): Promise<Item>;
   updateItem(id: number, item: Partial<InsertItem>): Promise<Item | undefined>;
   deleteItem(id: number): Promise<boolean>;
+}
+
+export class DatabaseStorage implements IStorage {
+  async getItems(searchQuery?: string, type?: string): Promise<Item[]> {
+    let query = db.select().from(items);
+    
+    const conditions = [];
+    
+    // Filter by type if specified
+    if (type && type !== 'all') {
+      conditions.push(eq(items.type, type));
+    }
+    
+    // Filter by search query if specified
+    if (searchQuery) {
+      const searchConditions = [
+        ilike(items.title, `%${searchQuery}%`),
+        ilike(items.content, `%${searchQuery}%`),
+        ilike(items.fileName, `%${searchQuery}%`)
+      ];
+      conditions.push(or(...searchConditions));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
+    }
+    
+    const results = await query.orderBy(items.createdAt);
+    return results.reverse(); // Show newest first
+  }
+
+  async getItem(id: number): Promise<Item | undefined> {
+    const [item] = await db.select().from(items).where(eq(items.id, id));
+    return item || undefined;
+  }
+
+  async createItem(insertItem: InsertItem): Promise<Item> {
+    const [item] = await db
+      .insert(items)
+      .values({
+        ...insertItem,
+        metadata: insertItem.metadata || null,
+        content: insertItem.content || null,
+        fileUrl: insertItem.fileUrl || null,
+        fileName: insertItem.fileName || null,
+        fileSize: insertItem.fileSize || null,
+        mimeType: insertItem.mimeType || null
+      })
+      .returning();
+    return item;
+  }
+
+  async updateItem(id: number, updateData: Partial<InsertItem>): Promise<Item | undefined> {
+    const [item] = await db
+      .update(items)
+      .set({
+        ...updateData,
+        updatedAt: new Date()
+      })
+      .where(eq(items.id, id))
+      .returning();
+    return item || undefined;
+  }
+
+  async deleteItem(id: number): Promise<boolean> {
+    const result = await db.delete(items).where(eq(items.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
 }
 
 export class MemStorage implements IStorage {
@@ -80,4 +150,4 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
