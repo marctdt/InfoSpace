@@ -1,21 +1,23 @@
-import { items, type Item, type InsertItem } from "@shared/schema";
+import { items, users, type Item, type InsertItem, type User, type UpsertUser } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, ilike, or } from "drizzle-orm";
 
 export interface IStorage {
-  getItems(searchQuery?: string, type?: string): Promise<Item[]>;
+  getItems(userId: string, searchQuery?: string, type?: string): Promise<Item[]>;
   getItem(id: number): Promise<Item | undefined>;
-  createItem(item: InsertItem): Promise<Item>;
+  createItem(userId: string, item: InsertItem): Promise<Item>;
   updateItem(id: number, item: Partial<InsertItem>): Promise<Item | undefined>;
   deleteItem(id: number): Promise<boolean>;
+  getUser(id: string): Promise<User | undefined>;
+  upsertUser(user: UpsertUser): Promise<User>;
 }
 
 export class DatabaseStorage implements IStorage {
-  async getItems(searchQuery?: string, type?: string): Promise<Item[]> {
+  async getItems(userId: string, searchQuery?: string, type?: string): Promise<Item[]> {
     try {
       let query = db.select().from(items);
       
-      const conditions = [];
+      const conditions = [eq(items.userId, userId)];
       
       // Filter by type if specified
       if (type && type !== 'all') {
@@ -32,9 +34,7 @@ export class DatabaseStorage implements IStorage {
         conditions.push(or(...searchConditions));
       }
       
-      if (conditions.length > 0) {
-        query = query.where(and(...conditions));
-      }
+      query = query.where(and(...conditions));
       
       const results = await query.orderBy(items.createdAt);
       return results.reverse(); // Show newest first
@@ -49,17 +49,18 @@ export class DatabaseStorage implements IStorage {
     return item || undefined;
   }
 
-  async createItem(insertItem: InsertItem): Promise<Item> {
+  async createItem(userId: string, insertItem: InsertItem): Promise<Item> {
     const [item] = await db
       .insert(items)
       .values({
         ...insertItem,
-        metadata: insertItem.metadata || null,
+        userId,
         content: insertItem.content || null,
         fileUrl: insertItem.fileUrl || null,
         fileName: insertItem.fileName || null,
         fileSize: insertItem.fileSize || null,
-        mimeType: insertItem.mimeType || null
+        mimeType: insertItem.mimeType || null,
+        metadata: insertItem.metadata || null
       })
       .returning();
     return item;
@@ -81,19 +82,41 @@ export class DatabaseStorage implements IStorage {
     const result = await db.delete(items).where(eq(items.id, id));
     return (result.rowCount ?? 0) > 0;
   }
+
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(userData)
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          ...userData,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return user;
+  }
 }
 
 export class MemStorage implements IStorage {
   private items: Map<number, Item>;
+  private users: Map<string, User>;
   private currentId: number;
 
   constructor() {
     this.items = new Map();
+    this.users = new Map();
     this.currentId = 1;
   }
 
-  async getItems(searchQuery?: string, type?: string): Promise<Item[]> {
-    let results = Array.from(this.items.values());
+  async getItems(userId: string, searchQuery?: string, type?: string): Promise<Item[]> {
+    let results = Array.from(this.items.values()).filter(item => item.userId === userId);
 
     // Filter by type if specified
     if (type && type !== 'all') {
@@ -121,12 +144,13 @@ export class MemStorage implements IStorage {
     return this.items.get(id);
   }
 
-  async createItem(insertItem: InsertItem): Promise<Item> {
+  async createItem(userId: string, insertItem: InsertItem): Promise<Item> {
     const id = this.currentId++;
     const now = new Date();
     const item: Item = {
       ...insertItem,
       id,
+      userId,
       createdAt: now,
       updatedAt: now,
     };
@@ -152,6 +176,22 @@ export class MemStorage implements IStorage {
 
   async deleteItem(id: number): Promise<boolean> {
     return this.items.delete(id);
+  }
+
+  async getUser(id: string): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const existingUser = this.users.get(userData.id);
+    const now = new Date();
+    const user: User = {
+      ...userData,
+      createdAt: existingUser?.createdAt || now,
+      updatedAt: now,
+    };
+    this.users.set(userData.id, user);
+    return user;
   }
 }
 
