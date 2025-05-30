@@ -1,7 +1,9 @@
-import { Copy, Eye, ExternalLink, Phone, Mail } from "lucide-react";
+import { useState } from "react";
+import { Copy, Eye, ExternalLink, Phone, Mail, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { Item, ContactMetadata, LinkMetadata } from "@/lib/types";
 import { formatDistanceToNow } from "date-fns";
@@ -12,6 +14,7 @@ interface ItemCardProps {
 
 export function ItemCard({ item }: ItemCardProps) {
   const { copyToClipboard } = useCopyToClipboard();
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
   const getFileIcon = (mimeType: string | null) => {
     if (!mimeType) return "📄";
@@ -224,19 +227,138 @@ export function ItemCard({ item }: ItemCardProps) {
             </Button>
           )}
           {item.type === "note" && (
-            <Button className="flex-1 text-sm">
+            <Button 
+              className="flex-1 text-sm"
+              onClick={() => setIsViewModalOpen(true)}
+            >
               <Eye className="w-4 h-4 mr-2" />
               View
             </Button>
           )}
           {item.type === "contact" && (
-            <Button className="flex-1 text-sm">
+            <Button 
+              className="flex-1 text-sm"
+              onClick={() => setIsViewModalOpen(true)}
+            >
               <Eye className="w-4 h-4 mr-2" />
               View
             </Button>
           )}
         </div>
       </CardContent>
+      
+      <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{item.title}</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {item.type === "note" && (
+              <div>
+                <h4 className="font-medium mb-2">Content</h4>
+                <div className="bg-muted p-4 rounded-lg">
+                  <p className="whitespace-pre-wrap text-sm">
+                    {item.content || "No content"}
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            {item.type === "contact" && (
+              <div className="space-y-4">
+                {(() => {
+                  const contactData = item.metadata ? JSON.parse(item.metadata) as ContactMetadata : {};
+                  return (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <h4 className="font-medium mb-2">Name</h4>
+                          <p className="text-sm">{item.title}</p>
+                        </div>
+                        {contactData.role && (
+                          <div>
+                            <h4 className="font-medium mb-2">Role</h4>
+                            <p className="text-sm">{contactData.role}</p>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {contactData.email && (
+                          <div>
+                            <h4 className="font-medium mb-2">Email</h4>
+                            <div className="flex items-center space-x-2">
+                              <Mail className="w-4 h-4 text-muted-foreground" />
+                              <a 
+                                href={`mailto:${contactData.email}`}
+                                className="text-sm text-blue-600 hover:underline"
+                              >
+                                {contactData.email}
+                              </a>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {contactData.phone && (
+                          <div>
+                            <h4 className="font-medium mb-2">Phone</h4>
+                            <div className="flex items-center space-x-2">
+                              <Phone className="w-4 h-4 text-muted-foreground" />
+                              <a 
+                                href={`tel:${contactData.phone}`}
+                                className="text-sm text-blue-600 hover:underline"
+                              >
+                                {contactData.phone}
+                              </a>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {contactData.company && (
+                        <div>
+                          <h4 className="font-medium mb-2">Company</h4>
+                          <p className="text-sm">{contactData.company}</p>
+                        </div>
+                      )}
+                      
+                      {item.content && (
+                        <div>
+                          <h4 className="font-medium mb-2">Notes</h4>
+                          <div className="bg-muted p-4 rounded-lg">
+                            <p className="whitespace-pre-wrap text-sm">{item.content}</p>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+            
+            {item.tags && item.tags.length > 0 && (
+              <div>
+                <h4 className="font-medium mb-2">Tags</h4>
+                <div className="flex flex-wrap gap-2">
+                  {item.tags.map((tag, index) => (
+                    <Badge key={index} variant="secondary">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            <div className="text-xs text-muted-foreground pt-2 border-t">
+              Created {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
+              {item.updatedAt && item.updatedAt !== item.createdAt && (
+                <span> • Updated {formatDistanceToNow(new Date(item.updatedAt), { addSuffix: true })}</span>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
