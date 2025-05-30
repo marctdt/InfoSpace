@@ -29,13 +29,14 @@ export class DatabaseStorage implements IStorage {
       }
       
       if (searchQuery) {
-        whereConditions.push(
-          or(
-            ilike(items.title, `%${searchQuery}%`),
-            ilike(items.content, `%${searchQuery}%`),
-            ilike(items.fileName, `%${searchQuery}%`)
-          )!
+        const searchClause = or(
+          ilike(items.title, `%${searchQuery}%`),
+          ilike(items.content, `%${searchQuery}%`),
+          ilike(items.fileName, `%${searchQuery}%`)
         );
+        if (searchClause) {
+          whereConditions.push(searchClause);
+        }
       }
       
       const results = await db
@@ -134,3 +135,5 @@ export class DatabaseStorage implements IStorage {
     }
   }
 }
+
+export const storage = new DatabaseStorage();
