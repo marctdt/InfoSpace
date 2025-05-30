@@ -12,31 +12,36 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   async getItems(searchQuery?: string, type?: string): Promise<Item[]> {
-    let query = db.select().from(items);
-    
-    const conditions = [];
-    
-    // Filter by type if specified
-    if (type && type !== 'all') {
-      conditions.push(eq(items.type, type));
+    try {
+      let query = db.select().from(items);
+      
+      const conditions = [];
+      
+      // Filter by type if specified
+      if (type && type !== 'all') {
+        conditions.push(eq(items.type, type));
+      }
+      
+      // Filter by search query if specified
+      if (searchQuery) {
+        const searchConditions = [
+          ilike(items.title, `%${searchQuery}%`),
+          ilike(items.content, `%${searchQuery}%`),
+          ilike(items.fileName, `%${searchQuery}%`)
+        ];
+        conditions.push(or(...searchConditions));
+      }
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions));
+      }
+      
+      const results = await query.orderBy(items.createdAt);
+      return results.reverse(); // Show newest first
+    } catch (error) {
+      console.error('Database query failed:', error);
+      throw error;
     }
-    
-    // Filter by search query if specified
-    if (searchQuery) {
-      const searchConditions = [
-        ilike(items.title, `%${searchQuery}%`),
-        ilike(items.content, `%${searchQuery}%`),
-        ilike(items.fileName, `%${searchQuery}%`)
-      ];
-      conditions.push(or(...searchConditions));
-    }
-    
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions));
-    }
-    
-    const results = await query.orderBy(items.createdAt);
-    return results.reverse(); // Show newest first
   }
 
   async getItem(id: number): Promise<Item | undefined> {
@@ -150,4 +155,4 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

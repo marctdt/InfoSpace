@@ -11,7 +11,7 @@ export const items = pgTable("items", {
   fileName: text("file_name"),
   fileSize: integer("file_size"),
   mimeType: text("mime_type"),
-  tags: text("tags").array().default([]),
+  tags: text("tags").array().$default(() => []),
   metadata: text("metadata"), // JSON string for additional data
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
