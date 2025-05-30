@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/header";
 import { QuickActions } from "@/components/quick-actions";
+import { QuickNote } from "@/components/quick-note";
 import { FilterTabs } from "@/components/filter-tabs";
 import { ItemCard } from "@/components/item-card";
 import { UploadModal } from "@/components/upload-modal";
@@ -50,6 +51,10 @@ export default function Home() {
           onAddContact={() => setIsContactModalOpen(true)}
           onAddLink={() => setIsLinkModalOpen(true)}
         />
+
+        <div className="mb-6">
+          <QuickNote />
+        </div>
 
         <FilterTabs 
           activeFilter={activeFilter} 
