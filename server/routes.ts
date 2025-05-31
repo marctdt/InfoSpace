@@ -73,6 +73,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update item
+  app.patch("/api/items/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updateData = req.body;
+      
+      const item = await storage.updateItem(id, updateData);
+      
+      if (!item) {
+        return res.status(404).json({ message: "Item not found" });
+      }
+      
+      res.json(item);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update item" });
+    }
+  });
+
   // Delete item
   app.delete("/api/items/:id", isAuthenticated, async (req: any, res) => {
     try {

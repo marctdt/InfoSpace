@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,35 +7,57 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import type { Item } from "@/lib/types";
 
 interface NoteModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  editItem?: Item;
 }
 
-export function NoteModal({ open, onOpenChange }: NoteModalProps) {
+export function NoteModal({ open, onOpenChange, editItem }: NoteModalProps) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [tags, setTags] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isEdit = !!editItem;
 
-  const createNoteMutation = useMutation({
+  useEffect(() => {
+    if (editItem && open) {
+      setTitle(editItem.title);
+      setContent(editItem.content || "");
+      setTags(editItem.tags ? editItem.tags.join(", ") : "");
+    }
+  }, [editItem, open]);
+
+  const saveNoteMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await apiRequest("POST", "/api/items/note", data);
-      return response.json();
+      if (isEdit) {
+        const response = await fetch(`/api/items/${editItem.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(data),
+        });
+        if (!response.ok) throw new Error("Failed to update note");
+        return response.json();
+      } else {
+        const response = await apiRequest("POST", "/api/items/note", data);
+        return response.json();
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/items"] });
       toast({
-        title: "Note created successfully!",
-        description: "Your note has been saved to your hub.",
+        title: isEdit ? "Note updated successfully!" : "Note created successfully!",
+        description: isEdit ? "Your note has been updated." : "Your note has been saved to your hub.",
       });
       handleClose();
     },
     onError: () => {
       toast({
-        title: "Failed to create note",
+        title: isEdit ? "Failed to update note" : "Failed to create note",
         description: "Please try again.",
         variant: "destructive",
       });
@@ -46,7 +68,7 @@ export function NoteModal({ open, onOpenChange }: NoteModalProps) {
     e.preventDefault();
     if (!title.trim() || !content.trim()) return;
 
-    createNoteMutation.mutate({
+    saveNoteMutation.mutate({
       title: title.trim(),
       content: content.trim(),
       tags: tags.split(",").map(tag => tag.trim()).filter(Boolean),
@@ -54,9 +76,11 @@ export function NoteModal({ open, onOpenChange }: NoteModalProps) {
   };
 
   const handleClose = () => {
-    setTitle("");
-    setContent("");
-    setTags("");
+    if (!isEdit) {
+      setTitle("");
+      setContent("");
+      setTags("");
+    }
     onOpenChange(false);
   };
 
@@ -64,7 +88,7 @@ export function NoteModal({ open, onOpenChange }: NoteModalProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Create Note</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit Note" : "Create Note"}</DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -107,10 +131,10 @@ export function NoteModal({ open, onOpenChange }: NoteModalProps) {
             </Button>
             <Button 
               type="submit" 
-              disabled={!title.trim() || !content.trim() || createNoteMutation.isPending}
+              disabled={!title.trim() || !content.trim() || saveNoteMutation.isPending}
               className="flex-1 bg-secondary hover:bg-secondary/90"
             >
-              {createNoteMutation.isPending ? "Creating..." : "Create Note"}
+              {saveNoteMutation.isPending ? (isEdit ? "Updating..." : "Creating...") : (isEdit ? "Update Note" : "Create Note")}
             </Button>
           </div>
         </form>

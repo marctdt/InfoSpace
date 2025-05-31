@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Copy, Eye, ExternalLink, Phone, Mail, Trash2, MoreVertical } from "lucide-react";
+import { Copy, Eye, ExternalLink, Phone, Mail, Trash2, MoreVertical, Edit } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,9 @@ import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { apiRequest } from "@/lib/queryClient";
 import { Item, ContactMetadata, LinkMetadata } from "@/lib/types";
 import { formatDistanceToNow } from "date-fns";
+import { NoteModal } from "./note-modal";
+import { ContactModal } from "./contact-modal";
+import { LinkModal } from "./link-modal";
 
 interface ItemCardProps {
   item: Item;
@@ -18,6 +21,7 @@ interface ItemCardProps {
 export function ItemCard({ item }: ItemCardProps) {
   const { copyToClipboard } = useCopyToClipboard();
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const deleteMutation = useMutation({
@@ -224,6 +228,12 @@ export function ItemCard({ item }: ItemCardProps) {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
+                  onClick={() => setIsEditModalOpen(true)}
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem
                   onClick={() => deleteMutation.mutate()}
                   className="text-red-600 focus:text-red-600"
                   disabled={deleteMutation.isPending}
@@ -402,6 +412,31 @@ export function ItemCard({ item }: ItemCardProps) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Modals */}
+      {item.type === "note" && (
+        <NoteModal
+          open={isEditModalOpen}
+          onOpenChange={setIsEditModalOpen}
+          editItem={item}
+        />
+      )}
+      
+      {item.type === "contact" && (
+        <ContactModal
+          open={isEditModalOpen}
+          onOpenChange={setIsEditModalOpen}
+          editItem={item}
+        />
+      )}
+      
+      {item.type === "link" && (
+        <LinkModal
+          open={isEditModalOpen}
+          onOpenChange={setIsEditModalOpen}
+          editItem={item}
+        />
+      )}
     </Card>
   );
 }
