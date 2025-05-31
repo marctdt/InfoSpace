@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,13 +7,15 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import type { Item } from "@/lib/types";
 
 interface ContactModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  editItem?: Item;
 }
 
-export function ContactModal({ open, onOpenChange }: ContactModalProps) {
+export function ContactModal({ open, onOpenChange, editItem }: ContactModalProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -23,23 +25,54 @@ export function ContactModal({ open, onOpenChange }: ContactModalProps) {
   const [tags, setTags] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isEdit = !!editItem;
 
-  const createContactMutation = useMutation({
+  useEffect(() => {
+    if (editItem && open) {
+      setName(editItem.title);
+      setNotes(editItem.content || "");
+      setTags(editItem.tags ? editItem.tags.join(", ") : "");
+      if (editItem.metadata) {
+        try {
+          const metadata = JSON.parse(editItem.metadata);
+          setEmail(metadata.email || "");
+          setPhone(metadata.phone || "");
+          setCompany(metadata.company || "");
+          setRole(metadata.role || "");
+        } catch (e) {
+          // Handle invalid JSON metadata
+        }
+      }
+    }
+  }, [editItem, open]);
+
+  const saveContactMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await apiRequest("POST", "/api/items/contact", data);
-      return response.json();
+      if (isEdit) {
+        const response = await fetch(`/api/items/${editItem.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(data),
+        });
+        if (!response.ok) throw new Error("Failed to update contact");
+        return response.json();
+      } else {
+        const response = await apiRequest("POST", "/api/items/contact", data);
+        return response.json();
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/items"] });
       toast({
-        title: "Contact created successfully!",
-        description: "Your contact has been saved to your hub.",
+        title: isEdit ? "Contact updated successfully!" : "Contact created successfully!",
+        description: isEdit ? "Your contact has been updated." : "Your contact has been saved to your hub.",
       });
       handleClose();
     },
     onError: () => {
       toast({
-        title: "Failed to create contact",
+        title: isEdit ? "Failed to update contact" : "Failed to create contact",
         description: "Please try again.",
         variant: "destructive",
       });
@@ -50,7 +83,7 @@ export function ContactModal({ open, onOpenChange }: ContactModalProps) {
     e.preventDefault();
     if (!name.trim()) return;
 
-    createContactMutation.mutate({
+    saveContactMutation.mutate({
       name: name.trim(),
       email: email.trim() || undefined,
       phone: phone.trim() || undefined,
@@ -62,13 +95,15 @@ export function ContactModal({ open, onOpenChange }: ContactModalProps) {
   };
 
   const handleClose = () => {
-    setName("");
-    setEmail("");
-    setPhone("");
-    setCompany("");
-    setRole("");
-    setNotes("");
-    setTags("");
+    if (!isEdit) {
+      setName("");
+      setEmail("");
+      setPhone("");
+      setCompany("");
+      setRole("");
+      setNotes("");
+      setTags("");
+    }
     onOpenChange(false);
   };
 
@@ -159,10 +194,10 @@ export function ContactModal({ open, onOpenChange }: ContactModalProps) {
             </Button>
             <Button 
               type="submit" 
-              disabled={!name.trim() || createContactMutation.isPending}
+              disabled={!name.trim() || saveContactMutation.isPending}
               className="flex-1 bg-accent hover:bg-accent/90"
             >
-              {createContactMutation.isPending ? "Creating..." : "Add Contact"}
+              {saveContactMutation.isPending ? (isEdit ? "Updating..." : "Creating...") : (isEdit ? "Update Contact" : "Add Contact")}
             </Button>
           </div>
         </form>
