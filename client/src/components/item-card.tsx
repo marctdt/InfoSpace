@@ -65,21 +65,27 @@ export function ItemCard({ item }: ItemCardProps) {
     
     switch (item.type) {
       case "file":
-        copyText = item.fileUrl || item.title;
+        copyText = item.fileUrl || "";
         break;
       case "note":
-        copyText = `${item.title}\n\n${item.content}`;
+        copyText = item.content || "";
         break;
       case "contact":
         const contactData = item.metadata ? JSON.parse(item.metadata) as ContactMetadata : {};
-        copyText = `${item.title}\n${contactData.email || ""}\n${contactData.phone || ""}`;
+        const contactInfo = [
+          contactData.email || "",
+          contactData.phone || "",
+          contactData.company || "",
+          contactData.role || ""
+        ].filter(Boolean).join("\n");
+        copyText = contactInfo;
         break;
       case "link":
         const linkData = item.metadata ? JSON.parse(item.metadata) as LinkMetadata : { url: item.fileUrl || "" };
         copyText = linkData.url;
         break;
       default:
-        copyText = item.title;
+        copyText = item.content || "";
     }
     
     copyToClipboard(copyText);
