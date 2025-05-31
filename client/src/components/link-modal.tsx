@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,36 +7,66 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import type { Item } from "@/lib/types";
 
 interface LinkModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  editItem?: Item;
 }
 
-export function LinkModal({ open, onOpenChange }: LinkModalProps) {
+export function LinkModal({ open, onOpenChange, editItem }: LinkModalProps) {
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isEdit = !!editItem;
 
-  const createLinkMutation = useMutation({
+  useEffect(() => {
+    if (editItem && open) {
+      setTitle(editItem.title);
+      setDescription(editItem.content || "");
+      setTags(editItem.tags ? editItem.tags.join(", ") : "");
+      if (editItem.metadata) {
+        try {
+          const metadata = JSON.parse(editItem.metadata);
+          setUrl(metadata.url || "");
+        } catch (e) {
+          // Handle invalid JSON metadata
+        }
+      }
+    }
+  }, [editItem, open]);
+
+  const saveLinkMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await apiRequest("POST", "/api/items/link", data);
-      return response.json();
+      if (isEdit) {
+        const response = await fetch(`/api/items/${editItem.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(data),
+        });
+        if (!response.ok) throw new Error("Failed to update link");
+        return response.json();
+      } else {
+        const response = await apiRequest("POST", "/api/items/link", data);
+        return response.json();
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/items"] });
       toast({
-        title: "Link saved successfully!",
-        description: "Your link has been saved to your hub.",
+        title: isEdit ? "Link updated successfully!" : "Link saved successfully!",
+        description: isEdit ? "Your link has been updated." : "Your link has been saved to your hub.",
       });
       handleClose();
     },
     onError: () => {
       toast({
-        title: "Failed to save link",
+        title: isEdit ? "Failed to update link" : "Failed to save link",
         description: "Please try again.",
         variant: "destructive",
       });
@@ -47,7 +77,7 @@ export function LinkModal({ open, onOpenChange }: LinkModalProps) {
     e.preventDefault();
     if (!title.trim() || !url.trim()) return;
 
-    createLinkMutation.mutate({
+    saveLinkMutation.mutate({
       title: title.trim(),
       url: url.trim(),
       description: description.trim() || undefined,
@@ -56,10 +86,12 @@ export function LinkModal({ open, onOpenChange }: LinkModalProps) {
   };
 
   const handleClose = () => {
-    setTitle("");
-    setUrl("");
-    setDescription("");
-    setTags("");
+    if (!isEdit) {
+      setTitle("");
+      setUrl("");
+      setDescription("");
+      setTags("");
+    }
     onOpenChange(false);
   };
 
@@ -67,7 +99,7 @@ export function LinkModal({ open, onOpenChange }: LinkModalProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Save Link</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit Link" : "Save Link"}</DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -121,10 +153,10 @@ export function LinkModal({ open, onOpenChange }: LinkModalProps) {
             </Button>
             <Button 
               type="submit" 
-              disabled={!title.trim() || !url.trim() || createLinkMutation.isPending}
+              disabled={!title.trim() || !url.trim() || saveLinkMutation.isPending}
               className="flex-1"
             >
-              {createLinkMutation.isPending ? "Saving..." : "Save Link"}
+              {saveLinkMutation.isPending ? (isEdit ? "Updating..." : "Saving...") : (isEdit ? "Update Link" : "Save Link")}
             </Button>
           </div>
         </form>
