@@ -297,7 +297,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.setHeader('Content-Type', item.mimeType);
       }
       
-      res.send(fileBuffer);
+      // Set proper headers for file download
+      if (item && item.fileName) {
+        res.setHeader('Content-Disposition', `inline; filename="${item.fileName}"`);
+      }
+      
+      // Send the actual file buffer, not JSON
+      res.end(fileBuffer);
     } catch (error) {
       console.error("Error serving file:", error);
       res.status(404).json({ message: "File not found" });
