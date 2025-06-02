@@ -11,7 +11,7 @@ import { z } from "zod";
 
 // Initialize Object Storage with specific bucket
 const objectStorage = new Client();
-const bucketName = "InforSapceStorage";
+const bucketName = "InforSpaceStorage";
 
 // Configure multer for file uploads (using memory storage)
 const upload = multer({
