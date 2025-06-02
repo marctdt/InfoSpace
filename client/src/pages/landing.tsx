@@ -17,7 +17,7 @@ export default function Landing() {
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                 <div className="w-4 h-4 bg-white rounded-sm"></div>
               </div>
-              <h1 className="text-xl font-semibold">InfoHub</h1>
+              <h1 className="text-xl font-semibold">InfoSpace</h1>
             </div>
             <Button onClick={handleLogin}>
               Sign In
@@ -30,7 +30,7 @@ export default function Landing() {
       <section className="py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto text-center">
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-6">
-            Your Personal Information Hub
+            Your Personal Information Space
           </h1>
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
             Seamlessly store, organize, and access your files, notes, contacts, and links across all your devices with a clean, intuitive interface.
@@ -100,7 +100,7 @@ export default function Landing() {
       {/* Benefits Section */}
       <section className="py-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12">Why Choose InfoHub?</h2>
+          <h2 className="text-3xl font-bold text-center mb-12">Why Choose InfoSpace?</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="text-center space-y-4">
               <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
@@ -140,10 +140,10 @@ export default function Landing() {
         <div className="max-w-2xl mx-auto text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to Get Organized?</h2>
           <p className="text-lg mb-8 opacity-90">
-            Join thousands of users who trust InfoHub to keep their information organized and accessible.
+            Join thousands of users who trust InfoSpace to keep their information organized and accessible.
           </p>
           <Button size="lg" variant="secondary" onClick={handleLogin} className="text-lg px-8 py-3">
-            Start Using InfoHub
+            Start Using InfoSpace
           </Button>
         </div>
       </section>
@@ -151,7 +151,7 @@ export default function Landing() {
       {/* Footer */}
       <footer className="border-t border-border py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto text-center text-muted-foreground">
-          <p>&copy; 2024 InfoHub. Your personal information management solution.</p>
+          <p>&copy; 2024 InfoSpace. Your personal information management solution.</p>
         </div>
       </footer>
     </div>
