@@ -65,7 +65,7 @@ export function ItemCard({ item }: ItemCardProps) {
 
     switch (item.type) {
       case "file":
-        copyText = item.fileUrl || "";
+        copyText = item.fileUrl ? `${window.location.origin}${item.fileUrl}` : "";
         break;
       case "note":
         copyText = item.content || "";
