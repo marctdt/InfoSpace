@@ -36,4 +36,4 @@ args = "npm run dev"
 waitForPort = 5000
 
 [objectStorage]
-defaultBucketID = "InfoSpaceStorage"
+defaultBucketID = "info-space-storage"
