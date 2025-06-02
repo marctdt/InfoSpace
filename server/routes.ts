@@ -134,7 +134,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(item);
     } catch (error) {
-      console.error('File upload error:', error);
       res.status(500).json({ message: "Failed to upload file" });
     }
   });
@@ -275,8 +274,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Serve uploaded files statically
-  app.use('/uploads', require('express').static(uploadDir));
+  // Serve uploaded files
+  app.use('/uploads', (req, res, next) => {
+    const filePath = path.join(uploadDir, req.path);
+    if (fs.existsSync(filePath)) {
+      res.sendFile(filePath);
+    } else {
+      res.status(404).json({ message: "File not found" });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;
