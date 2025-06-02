@@ -292,27 +292,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log('File response type:', typeof fileResponse);
       console.log('File response keys:', fileResponse ? Object.keys(fileResponse) : 'null');
+      console.log('File response structure:', JSON.stringify(fileResponse, null, 2).substring(0, 500));
       
       // Extract the actual bytes from the response
       let fileBuffer: Buffer;
       if (fileResponse && typeof fileResponse === 'object') {
-        if ('value' in fileResponse && Array.isArray(fileResponse.value)) {
-          // Handle array of bytes
+        if ('ok' in fileResponse && fileResponse.ok === true && 'value' in fileResponse) {
+          // Handle successful response wrapper format
+          const value = fileResponse.value;
+          console.log('Value type:', typeof value, 'Array?', Array.isArray(value));
+          
+          if (Array.isArray(value) && value.length > 0) {
+            const firstItem = value[0];
+            console.log('First item type:', typeof firstItem, 'Keys:', firstItem ? Object.keys(firstItem) : 'none');
+            
+            if (firstItem && typeof firstItem === 'object' && 'type' in firstItem && firstItem.type === 'Buffer' && 'data' in firstItem) {
+              // Handle nested Buffer format: {type: "Buffer", data: [numbers]}
+              console.log('Using nested Buffer format, data length:', firstItem.data.length);
+              fileBuffer = Buffer.from(firstItem.data);
+            } else if (typeof firstItem === 'number') {
+              // Handle direct array of numbers
+              console.log('Using direct number array format, length:', value.length);
+              fileBuffer = Buffer.from(value);
+            } else {
+              throw new Error(`Unexpected value format in Object Storage response: ${JSON.stringify(firstItem).substring(0, 100)}`);
+            }
+          } else {
+            throw new Error(`Empty or invalid value array in Object Storage response`);
+          }
+        } else if ('ok' in fileResponse && fileResponse.ok === false) {
+          // Handle error response
+          throw new Error(`Object Storage error: ${fileResponse.error?.message || 'Unknown error'}`);
+        } else if ('value' in fileResponse && Array.isArray(fileResponse.value)) {
+          // Handle direct value format without ok wrapper
           const bytes = fileResponse.value;
           if (bytes.length > 0 && bytes[0] && typeof bytes[0] === 'object' && 'data' in bytes[0]) {
-            // Handle nested Buffer format: {type: "Buffer", data: [numbers]}
             fileBuffer = Buffer.from(bytes[0].data);
           } else {
-            // Handle direct array of numbers
             fileBuffer = Buffer.from(bytes);
-          }
-        } else if ('ok' in fileResponse && fileResponse.ok === true && 'value' in fileResponse) {
-          // Handle response wrapper format
-          const value = fileResponse.value;
-          if (Array.isArray(value) && value.length > 0 && value[0] && typeof value[0] === 'object' && 'data' in value[0]) {
-            fileBuffer = Buffer.from(value[0].data);
-          } else {
-            fileBuffer = Buffer.from(value);
           }
         } else if (Buffer.isBuffer(fileResponse)) {
           fileBuffer = fileResponse;
