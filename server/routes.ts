@@ -1,22 +1,15 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
-import { Client } from "@replit/object-storage";
 import { storage } from "./storage-final";
 import { insertItemSchema, contactSchema, linkSchema, noteSchema } from "@shared/schema";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { z } from "zod";
 
-// Initialize Replit Object Storage
-let objectStorage: Client | null = null;
+// Store files in memory for now - we'll implement persistent storage with proper configuration
+const fileStore = new Map<string, { buffer: Buffer; mimetype: string; originalname: string }>();
 
-try {
-  objectStorage = new Client();
-} catch (error) {
-  console.log("Object storage not available, files will be stored temporarily");
-}
-
-// Configure multer for memory storage (we'll upload to object storage)
+// Configure multer for memory storage
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -125,8 +118,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fileExtension = req.file.originalname.split('.').pop();
       const uniqueFilename = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExtension}`;
       
-      // Upload to Replit Object Storage
-      await objectStorage.write(uniqueFilename, req.file.buffer);
+      // Store file in memory store
+      fileStore.set(uniqueFilename, {
+        buffer: req.file.buffer,
+        mimetype: req.file.mimetype,
+        originalname: req.file.originalname
+      });
 
       // Create a URL for the uploaded file
       const fileUrl = `/files/${uniqueFilename}`;
@@ -286,16 +283,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Serve files from object storage
+  // Serve files from memory store
   app.get('/files/:filename', async (req, res) => {
     try {
       const filename = req.params.filename;
-      const fileBuffer = await objectStorage.read(filename);
+      const file = fileStore.get(filename);
       
-      // Set appropriate headers
-      res.setHeader('Content-Type', 'application/octet-stream');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.send(fileBuffer);
+      if (file) {
+        // Set appropriate headers
+        res.setHeader('Content-Type', file.mimetype);
+        res.setHeader('Content-Disposition', `attachment; filename="${file.originalname}"`);
+        res.send(file.buffer);
+      } else {
+        res.status(404).json({ message: "File not found" });
+      }
     } catch (error) {
       res.status(404).json({ message: "File not found" });
     }
