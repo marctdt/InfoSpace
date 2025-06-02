@@ -37,7 +37,7 @@ export function Header({ searchQuery, onSearchChange }: HeaderProps) {
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <div className="w-4 h-4 bg-white rounded-sm"></div>
             </div>
-            <h1 className="text-xl font-semibold">InfoHub</h1>
+            <h1 className="text-xl font-semibold">InfoSpace</h1>
           </div>
           
           {/* Desktop Search */}
