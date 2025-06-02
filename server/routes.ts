@@ -275,7 +275,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Files are now served directly from Object Storage via download URLs
+  // Serve uploaded files statically
+  app.use('/uploads', require('express').static(uploadDir));
 
   const httpServer = createServer(app);
   return httpServer;
