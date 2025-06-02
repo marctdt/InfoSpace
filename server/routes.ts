@@ -304,12 +304,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           if (Array.isArray(value) && value.length > 0) {
             const firstItem = value[0];
-            console.log('First item type:', typeof firstItem, 'Keys:', firstItem ? Object.keys(firstItem) : 'none');
+            console.log('First item type:', typeof firstItem, 'Keys:', firstItem ? Object.keys(firstItem).slice(0, 10) : 'none');
             
-            if (firstItem && typeof firstItem === 'object' && 'type' in firstItem && firstItem.type === 'Buffer' && 'data' in firstItem) {
-              // Handle nested Buffer format: {type: "Buffer", data: [numbers]}
-              console.log('Using nested Buffer format, data length:', firstItem.data.length);
-              fileBuffer = Buffer.from(firstItem.data);
+            if (firstItem && typeof firstItem === 'object') {
+              // Check if it's a Buffer-like object with numeric keys
+              const keys = Object.keys(firstItem);
+              const isNumericKeys = keys.length > 0 && keys.every(key => !isNaN(parseInt(key)));
+              
+              if (isNumericKeys) {
+                // Handle object with numeric keys (which is a serialized Buffer)
+                console.log('Using object with numeric keys format, length:', keys.length);
+                const bytes = keys.map(key => firstItem[key]);
+                fileBuffer = Buffer.from(bytes);
+              } else if ('type' in firstItem && firstItem.type === 'Buffer' && 'data' in firstItem) {
+                // Handle nested Buffer format: {type: "Buffer", data: [numbers]}
+                console.log('Using nested Buffer format, data length:', firstItem.data.length);
+                fileBuffer = Buffer.from(firstItem.data);
+              } else {
+                throw new Error(`Unexpected object format in Object Storage response: ${JSON.stringify(firstItem).substring(0, 100)}`);
+              }
             } else if (typeof firstItem === 'number') {
               // Handle direct array of numbers
               console.log('Using direct number array format, length:', value.length);
