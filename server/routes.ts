@@ -1,17 +1,21 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
+import path from "path";
+import fs from "fs";
 import { storage } from "./storage-final";
 import { insertItemSchema, contactSchema, linkSchema, noteSchema } from "@shared/schema";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { z } from "zod";
 
-// Store files in memory for now - we'll implement persistent storage with proper configuration
-const fileStore = new Map<string, { buffer: Buffer; mimetype: string; originalname: string }>();
+// Configure multer for file uploads
+const uploadDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 
-// Configure multer for memory storage
 const upload = multer({
-  storage: multer.memoryStorage(),
+  dest: uploadDir,
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit
   },
@@ -114,19 +118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const parsedTags = JSON.parse(tags);
       const userId = req.user.claims.sub;
 
-      // Generate unique filename
-      const fileExtension = req.file.originalname.split('.').pop();
-      const uniqueFilename = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExtension}`;
-      
-      // Store file in memory store
-      fileStore.set(uniqueFilename, {
-        buffer: req.file.buffer,
-        mimetype: req.file.mimetype,
-        originalname: req.file.originalname
-      });
-
-      // Create a URL for the uploaded file
-      const fileUrl = `/files/${uniqueFilename}`;
+      const fileUrl = `/uploads/${req.file.filename}`;
       
       const item = await storage.createItem(userId, {
         title: req.file.originalname,
@@ -137,12 +129,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fileSize: req.file.size,
         mimeType: req.file.mimetype,
         tags: parsedTags,
-        metadata: JSON.stringify({ storageKey: uniqueFilename }),
+        metadata: null,
       });
 
       res.json(item);
     } catch (error) {
-      console.error("File upload error:", error);
       res.status(500).json({ message: "Failed to upload file" });
     }
   });
@@ -283,21 +274,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Serve files from memory store
-  app.get('/files/:filename', async (req, res) => {
-    try {
-      const filename = req.params.filename;
-      const file = fileStore.get(filename);
-      
-      if (file) {
-        // Set appropriate headers
-        res.setHeader('Content-Type', file.mimetype);
-        res.setHeader('Content-Disposition', `attachment; filename="${file.originalname}"`);
-        res.send(file.buffer);
-      } else {
-        res.status(404).json({ message: "File not found" });
-      }
-    } catch (error) {
+  // Serve uploaded files
+  app.use('/uploads', (req, res, next) => {
+    const filePath = path.join(uploadDir, req.path);
+    if (fs.existsSync(filePath)) {
+      res.sendFile(filePath);
+    } else {
       res.status(404).json({ message: "File not found" });
     }
   });
