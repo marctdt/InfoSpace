@@ -288,7 +288,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fileKey = req.params[0]; // Get everything after /api/files/
       
       // Download file from Object Storage
-      const fileBuffer = await objectStorage.downloadAsBytes(fileKey);
+      const fileResponse = await objectStorage.downloadAsBytes(fileKey);
+      
+      // Extract the actual bytes from the response
+      let fileBuffer: Buffer;
+      if (fileResponse && typeof fileResponse === 'object' && 'value' in fileResponse) {
+        // If response has a 'value' property, extract it
+        const bytes = fileResponse.value;
+        if (Array.isArray(bytes)) {
+          fileBuffer = Buffer.from(bytes);
+        } else if (Buffer.isBuffer(bytes)) {
+          fileBuffer = bytes;
+        } else {
+          throw new Error('Invalid file data format');
+        }
+      } else if (Buffer.isBuffer(fileResponse)) {
+        fileBuffer = fileResponse;
+      } else {
+        throw new Error('Unexpected response format from Object Storage');
+      }
       
       // Get file metadata from database to set proper content type
       const item = await storage.getItemByObjectKey(fileKey);
