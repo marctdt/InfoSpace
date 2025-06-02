@@ -3,18 +3,19 @@ import { createServer, type Server } from "http";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { Client } from "@replit/object-storage";
 import { storage } from "./storage-final";
 import { insertItemSchema, contactSchema, linkSchema, noteSchema } from "@shared/schema";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { z } from "zod";
 
-// Initialize Object Storage
-const objectStorage = new Client();
+// Configure multer for file uploads
+const uploadDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 
-// Configure multer for file uploads (using memory storage)
 const upload = multer({
-  storage: multer.memoryStorage(),
+  dest: uploadDir,
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit
   },
@@ -117,17 +118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const parsedTags = JSON.parse(tags);
       const userId = req.user.claims.sub;
 
-      // Generate unique filename
-      const timestamp = Date.now();
-      const filename = `${timestamp}-${req.file.originalname}`;
-      
-      // Upload to Object Storage
-      await objectStorage.uploadFromBytes(filename, req.file.buffer, {
-        contentType: req.file.mimetype,
-      });
-
-      // Get the public URL
-      const fileUrl = await objectStorage.getDownloadUrl(filename);
+      const fileUrl = `/uploads/${req.file.filename}`;
       
       const item = await storage.createItem(userId, {
         title: req.file.originalname,
@@ -138,7 +129,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fileSize: req.file.size,
         mimeType: req.file.mimetype,
         tags: parsedTags,
-        metadata: JSON.stringify({ objectStorageKey: filename }),
+        metadata: null,
       });
 
       res.json(item);
