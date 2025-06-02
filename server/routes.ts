@@ -9,8 +9,9 @@ import { insertItemSchema, contactSchema, linkSchema, noteSchema } from "@shared
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { z } from "zod";
 
-// Initialize Object Storage
+// Initialize Object Storage with specific bucket
 const objectStorage = new Client();
+const bucketName = "InforSapceStorage";
 
 // Configure multer for file uploads (using memory storage)
 const upload = multer({
@@ -121,13 +122,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const timestamp = Date.now();
       const filename = `${timestamp}-${req.file.originalname}`;
       
-      // Upload to Object Storage
+      // Upload to Object Storage with specific bucket
       await objectStorage.uploadFromBytes(filename, req.file.buffer, {
         contentType: req.file.mimetype,
+        bucket: bucketName,
       });
 
-      // Get the public URL
-      const fileUrl = await objectStorage.getDownloadUrl(filename);
+      // Get the public URL from specific bucket
+      const fileUrl = await objectStorage.getDownloadUrl(filename, { bucket: bucketName });
       
       const item = await storage.createItem(userId, {
         title: req.file.originalname,
