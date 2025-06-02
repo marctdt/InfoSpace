@@ -290,17 +290,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Download file from Object Storage
       const fileResponse = await objectStorage.downloadAsBytes(fileKey);
       
+      console.log('File response type:', typeof fileResponse);
+      console.log('File response keys:', fileResponse ? Object.keys(fileResponse) : 'null');
+      
       // Extract the actual bytes from the response
       let fileBuffer: Buffer;
-      if (fileResponse && typeof fileResponse === 'object' && 'value' in fileResponse) {
-        // If response has a 'value' property, extract it
-        const bytes = fileResponse.value;
-        if (Array.isArray(bytes)) {
-          fileBuffer = Buffer.from(bytes);
-        } else if (Buffer.isBuffer(bytes)) {
-          fileBuffer = bytes;
+      if (fileResponse && typeof fileResponse === 'object') {
+        if ('value' in fileResponse && Array.isArray(fileResponse.value)) {
+          // Handle array of bytes
+          const bytes = fileResponse.value;
+          if (bytes.length > 0 && bytes[0] && typeof bytes[0] === 'object' && 'data' in bytes[0]) {
+            // Handle nested Buffer format: {type: "Buffer", data: [numbers]}
+            fileBuffer = Buffer.from(bytes[0].data);
+          } else {
+            // Handle direct array of numbers
+            fileBuffer = Buffer.from(bytes);
+          }
+        } else if ('ok' in fileResponse && fileResponse.ok === true && 'value' in fileResponse) {
+          // Handle response wrapper format
+          const value = fileResponse.value;
+          if (Array.isArray(value) && value.length > 0 && value[0] && typeof value[0] === 'object' && 'data' in value[0]) {
+            fileBuffer = Buffer.from(value[0].data);
+          } else {
+            fileBuffer = Buffer.from(value);
+          }
+        } else if (Buffer.isBuffer(fileResponse)) {
+          fileBuffer = fileResponse;
         } else {
-          throw new Error('Invalid file data format');
+          throw new Error(`Unexpected Object Storage response format: ${JSON.stringify(fileResponse).substring(0, 200)}`);
         }
       } else if (Buffer.isBuffer(fileResponse)) {
         fileBuffer = fileResponse;
