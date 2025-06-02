@@ -3,19 +3,15 @@ import { createServer, type Server } from "http";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { Client } from "@replit/object-storage";
 import { storage } from "./storage-final";
 import { insertItemSchema, contactSchema, linkSchema, noteSchema } from "@shared/schema";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { z } from "zod";
 
-// Configure multer for file uploads
-const uploadDir = path.join(process.cwd(), 'uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
+// Configure multer to store files in memory
 const upload = multer({
-  dest: uploadDir,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit
   },
@@ -24,6 +20,9 @@ const upload = multer({
     cb(null, true);
   },
 });
+
+// Initialize Object Storage client
+const objectStorage = new Client();
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -118,7 +117,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const parsedTags = JSON.parse(tags);
       const userId = req.user.claims.sub;
 
-      const fileUrl = `/uploads/${req.file.filename}`;
+      // Generate unique filename
+      const fileKey = `${userId}/${Date.now()}-${req.file.originalname}`;
+      
+      // Upload to Object Storage
+      await objectStorage.uploadFromBytes(fileKey, req.file.buffer, {
+        contentType: req.file.mimetype,
+      });
+
+      const fileUrl = `/api/files/${fileKey}`;
       
       const item = await storage.createItem(userId, {
         title: req.file.originalname,
@@ -129,11 +136,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fileSize: req.file.size,
         mimeType: req.file.mimetype,
         tags: parsedTags,
-        metadata: null,
+        metadata: JSON.stringify({ objectKey: fileKey }),
       });
 
       res.json(item);
     } catch (error) {
+      console.error("Error uploading file:", error);
       res.status(500).json({ message: "Failed to upload file" });
     }
   });
@@ -274,12 +282,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Serve uploaded files
-  app.use('/uploads', (req, res, next) => {
-    const filePath = path.join(uploadDir, req.path);
-    if (fs.existsSync(filePath)) {
-      res.sendFile(filePath);
-    } else {
+  // Serve files from Object Storage
+  app.get('/api/files/*', async (req, res) => {
+    try {
+      const fileKey = req.params[0]; // Get everything after /api/files/
+      
+      // Download file from Object Storage
+      const fileBuffer = await objectStorage.downloadAsBytes(fileKey);
+      
+      // Get file metadata from database to set proper content type
+      const item = await storage.getItemByObjectKey(fileKey);
+      
+      if (item && item.mimeType) {
+        res.setHeader('Content-Type', item.mimeType);
+      }
+      
+      res.send(fileBuffer);
+    } catch (error) {
+      console.error("Error serving file:", error);
       res.status(404).json({ message: "File not found" });
     }
   });

@@ -8,10 +8,12 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, ilike } from "drizzle-orm";
+import { Client } from "@replit/object-storage";
 
 export interface IStorage {
   getItems(userId: string, searchQuery?: string, type?: string): Promise<Item[]>;
   getItem(id: number): Promise<Item | undefined>;
+  getItemByObjectKey(objectKey: string): Promise<Item | undefined>;
   createItem(userId: string, item: InsertItem): Promise<Item>;
   updateItem(id: number, item: Partial<InsertItem>): Promise<Item | undefined>;
   deleteItem(id: number): Promise<boolean>;
@@ -20,6 +22,8 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  private objectStorage = new Client();
+
   async getItems(userId: string, searchQuery?: string, type?: string): Promise<Item[]> {
     try {
       let whereConditions = [eq(items.userId, userId)];
@@ -62,6 +66,16 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async getItemByObjectKey(objectKey: string): Promise<Item | undefined> {
+    try {
+      const [item] = await db.select().from(items).where(ilike(items.metadata, `%"objectKey":"${objectKey}"%`));
+      return item;
+    } catch (error) {
+      console.error('Error fetching item by object key:', error);
+      return undefined;
+    }
+  }
+
   async createItem(userId: string, insertItem: InsertItem): Promise<Item> {
     try {
       const [item] = await db
@@ -97,7 +111,25 @@ export class DatabaseStorage implements IStorage {
 
   async deleteItem(id: number): Promise<boolean> {
     try {
+      // Get the item first to check if it has an object key
+      const item = await this.getItem(id);
+      
+      // Delete from database
       const result = await db.delete(items).where(eq(items.id, id));
+      
+      // If item has object storage data, delete from object storage too
+      if (item && item.metadata && item.type === 'file') {
+        try {
+          const metadata = JSON.parse(item.metadata);
+          if (metadata.objectKey) {
+            await this.objectStorage.delete(metadata.objectKey);
+          }
+        } catch (objError) {
+          console.error('Error deleting from object storage:', objError);
+          // Don't fail the whole operation if object storage deletion fails
+        }
+      }
+      
       return (result.rowCount ?? 0) > 0;
     } catch (error) {
       console.error('Error deleting item:', error);
