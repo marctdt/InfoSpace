@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Copy, Eye, ExternalLink, Phone, Mail, Trash2, MoreVertical, Edit } from "lucide-react";
+import { Copy, Eye, ExternalLink, Phone, Mail, Trash2, MoreVertical, Edit, Download } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -62,7 +62,7 @@ export function ItemCard({ item }: ItemCardProps) {
 
   const handleCopy = () => {
     let copyText = "";
-    
+
     switch (item.type) {
       case "file":
         copyText = item.fileUrl || "";
@@ -87,7 +87,7 @@ export function ItemCard({ item }: ItemCardProps) {
       default:
         copyText = item.content || "";
     }
-    
+
     copyToClipboard(copyText);
   };
 
@@ -96,7 +96,8 @@ export function ItemCard({ item }: ItemCardProps) {
       const linkData = item.metadata ? JSON.parse(item.metadata) as LinkMetadata : { url: item.fileUrl || "" };
       window.open(linkData.url, "_blank");
     } else if (item.type === "file" && item.fileUrl) {
-      window.open(item.fileUrl, "_blank");
+      // For files, open in same tab to allow browser to handle preview/download
+      window.location.href = `${item.fileUrl}?action=preview`;
     }
   };
 
@@ -204,11 +205,19 @@ export function ItemCard({ item }: ItemCardProps) {
     }
   };
 
+  const handleEdit = () => {
+    setIsEditModalOpen(true);
+  };
+
+  const handleDelete = () => {
+    deleteMutation.mutate();
+  };
+
   return (
     <Card className="hover:shadow-md transition-all duration-200 group">
       <CardContent className="p-4">
         {renderContent()}
-        
+
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs text-muted-foreground">
             {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
@@ -232,19 +241,26 @@ export function ItemCard({ item }: ItemCardProps) {
                   <MoreVertical className="w-4 h-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onClick={() => setIsEditModalOpen(true)}
-                >
-                  <Edit className="w-4 h-4 mr-2" />
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={handleEdit}>
+                  <Edit className="mr-2 h-4 w-4" />
                   Edit
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => deleteMutation.mutate()}
-                  className="text-red-600 focus:text-red-600"
-                  disabled={deleteMutation.isPending}
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
+                {item.type === 'file' && item.fileUrl && (
+                  <DropdownMenuItem onClick={() => {
+                    const link = document.createElement('a');
+                    link.href = `${item.fileUrl}?action=download`;
+                    link.download = item.fileName || 'file';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Download
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={handleDelete} className="text-red-600">
+                  <Trash2 className="mr-2 h-4 w-4" />
                   {deleteMutation.isPending ? "Deleting..." : "Delete"}
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -305,13 +321,13 @@ export function ItemCard({ item }: ItemCardProps) {
           )}
         </div>
       </CardContent>
-      
+
       <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{item.title}</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             {item.type === "note" && (
               <div>
@@ -323,7 +339,7 @@ export function ItemCard({ item }: ItemCardProps) {
                 </div>
               </div>
             )}
-            
+
             {item.type === "contact" && (
               <div className="space-y-4">
                 {(() => {
@@ -342,7 +358,7 @@ export function ItemCard({ item }: ItemCardProps) {
                           </div>
                         )}
                       </div>
-                      
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {contactData.email && (
                           <div>
@@ -358,7 +374,7 @@ export function ItemCard({ item }: ItemCardProps) {
                             </div>
                           </div>
                         )}
-                        
+
                         {contactData.phone && (
                           <div>
                             <h4 className="font-medium mb-2">Phone</h4>
@@ -374,14 +390,14 @@ export function ItemCard({ item }: ItemCardProps) {
                           </div>
                         )}
                       </div>
-                      
+
                       {contactData.company && (
                         <div>
                           <h4 className="font-medium mb-2">Company</h4>
                           <p className="text-sm">{contactData.company}</p>
                         </div>
                       )}
-                      
+
                       {item.content && (
                         <div>
                           <h4 className="font-medium mb-2">Notes</h4>
@@ -395,7 +411,7 @@ export function ItemCard({ item }: ItemCardProps) {
                 })()}
               </div>
             )}
-            
+
             {item.tags && item.tags.length > 0 && (
               <div>
                 <h4 className="font-medium mb-2">Tags</h4>
@@ -408,7 +424,7 @@ export function ItemCard({ item }: ItemCardProps) {
                 </div>
               </div>
             )}
-            
+
             <div className="text-xs text-muted-foreground pt-2 border-t">
               Created {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
               {item.updatedAt && item.updatedAt !== item.createdAt && (
@@ -427,7 +443,7 @@ export function ItemCard({ item }: ItemCardProps) {
           editItem={item}
         />
       )}
-      
+
       {item.type === "contact" && (
         <ContactModal
           open={isEditModalOpen}
@@ -435,7 +451,7 @@ export function ItemCard({ item }: ItemCardProps) {
           editItem={item}
         />
       )}
-      
+
       {item.type === "link" && (
         <LinkModal
           open={isEditModalOpen}

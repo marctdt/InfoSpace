@@ -315,10 +315,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.setHeader('Content-Type', item.mimeType);
       }
       
-      // Set proper headers for file download
+      // Set proper headers based on query parameter
+      const action = req.query.action || 'preview'; // 'download' or 'preview'
+      
       if (item && item.fileName) {
-        res.setHeader('Content-Disposition', `inline; filename="${item.fileName}"`);
+        if (action === 'download') {
+          res.setHeader('Content-Disposition', `attachment; filename="${item.fileName}"`);
+        } else {
+          res.setHeader('Content-Disposition', `inline; filename="${item.fileName}"`);
+        }
       }
+      
+      // Set additional headers for better browser handling
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Content-Length', fileBuffer.length.toString());
       
       // Send the actual file buffer, not JSON
       res.end(fileBuffer);
